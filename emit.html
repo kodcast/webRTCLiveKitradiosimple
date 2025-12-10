@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎙 Émetteur Flux Vélorutionnaire</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #111;
+      color: #fff;
+      min-height: 100vh;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .container {
+      width: 100%;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    
+    img {
+      max-width: 150px;
+      width: 100%;
+      height: auto;
+      margin-bottom: 20px;
+    }
+    
+    h1 {
+      font-size: clamp(1.5rem, 4vw, 2rem);
+      margin-bottom: 15px;
+      word-wrap: break-word;
+    }
+    
+    p {
+      margin-bottom: 20px;
+      line-height: 1.5;
+      font-size: clamp(1rem, 3vw, 1.1rem);
+    }
+    
+    .button-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      margin: 20px 0;
+      width: 100%;
+    }
+    
+    button {
+      padding: 12px 20px;
+      font-size: clamp(0.9rem, 3vw, 1rem);
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      background: #28a745;
+      color: #fff;
+      flex: 1;
+      min-width: 140px;
+      max-width: 200px;
+      transition: background-color 0.3s;
+    }
+    
+    button:hover {
+      background: #218838;
+    }
+    
+    button:disabled {
+      background: #555;
+      cursor: not-allowed;
+    }
+    
+    button:disabled:hover {
+      background: #555;
+    }
+    
+    #status {
+      margin-top: 20px;
+      font-weight: bold;
+      min-height: 24px;
+      padding: 10px;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.1);
+      width: 100%;
+      word-wrap: break-word;
+      font-size: clamp(0.9rem, 3vw, 1rem);
+    }
+    
+    /* Media queries pour les très petits écrans */
+    @media (max-width: 480px) {
+      body {
+        padding: 15px;
+      }
+      
+      .container {
+        padding: 15px;
+      }
+      
+      button {
+        min-width: 120px;
+        padding: 10px 16px;
+      }
+      
+      .button-container {
+        flex-direction: column;
+        align-items: center;
+      }
+      
+      .button-container button {
+        max-width: 100%;
+        width: 100%;
+      }
+    }
+    
+    /* Media queries pour les tablettes */
+    @media (min-width: 768px) and (max-width: 1024px) {
+      .container {
+        max-width: 700px;
+        padding: 30px;
+      }
+    }
+    
+    /* Pour éviter les débordements horizontaux */
+    .overflow-protection {
+      overflow-wrap: break-word;
+      word-wrap: break-word;
+      hyphens: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <img src="../logo.png" alt="Logo Vélorutionnaire" />
+    
+    <h1 class="overflow-protection">🎙 Émetteur Flux Vélorutionnaire</h1>
+    
+    <p>Clique sur "Démarrer" pour diffuser la musique.</p>
+    
+    <div class="button-container">
+      <button id="startBtn">Démarrer l'émission</button>
+      <button id="stopBtn" disabled>Arrêter</button>
+    </div>
+    
+    <p id="status">Prêt.</p>
+  </div>
+
+  <script type="module">
+    import { Room, createLocalAudioTrack, LocalAudioTrack } from 'https://cdn.jsdelivr.net/npm/livekit-client@2.5.1/dist/livekit-client.esm.mjs';
+
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const statusEl = document.getElementById('status');
+
+    const LIVEKIT_URL = "wss://velorutionsaintnazaire.fr/livekit";
+    let room = null;
+    let localAudioTrack = null;
+    let audioContext = null;
+
+    startBtn.addEventListener('click', async () => {
+      startBtn.disabled = true;
+      statusEl.textContent = "Récupération du token et connexion...";
+
+      try {
+        const response = await fetch('/token?room=room1&identity=mycki');
+        const data = await response.json();
+        const TOKEN = data.token;
+
+        room = new Room();
+        await room.connect(LIVEKIT_URL, TOKEN);
+        statusEl.textContent = "Connecté. Accès au micro...";
+
+        const rawTrack = await createLocalAudioTrack({
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          voiceActivityDetection: false,
+          //latencyHint: "interactive",
+          sampleRate: 44100,
+          channelCount: 2,
+        });
+
+        // Web Audio simplifié : source → EQ léger (optionnel) → gain → destination
+        audioContext = new AudioContext();
+        const source = audioContext.createMediaStreamSource(rawTrack.mediaStream);
+
+        // Égaliseur très léger (optionnel)
+        //const bass = audioContext.createBiquadFilter();
+        //bass.type = "lowshelf";
+        //bass.frequency.value = 150;
+        //bass.gain.value = 2;  // léger boost
+
+        //const mid = audioContext.createBiquadFilter();
+        //mid.type = "peaking";
+        //mid.frequency.value = 1000;
+        //mid.Q.value = 1;
+        //mid.gain.value = 1;   // très léger
+
+        //const treble = audioContext.createBiquadFilter();
+        //treble.type = "highshelf";
+        //treble.frequency.value = 8000;
+        //treble.gain.value = 1; // très léger
+
+        const gainNode = audioContext.createGain();
+        gainNode.gain.value = 1; // volume général
+
+        const dest = audioContext.createMediaStreamDestination();
+
+        // Chaînage simplifié : source → EQ → gain → destination
+        source.connect(gainNode);
+        //bass.connect(mid);
+        //mid.connect(treble);
+        //treble.connect(gainNode);
+        gainNode.connect(dest);
+
+        localAudioTrack = new LocalAudioTrack(dest.stream.getAudioTracks()[0]);
+
+        await room.localParticipant.publishTrack(localAudioTrack, {
+          audioEncoding: "opus",
+          maxAverageBitrate: 128000,  // bitrate plus léger pour réduire charge
+          stereo: true,
+            dtx: false,                // désactive la compression de silence, moins de buffering
+            opusFrameDuration: 10, 
+           
+        });
+
+        statusEl.textContent = "🎧 Émission en direct !";
+        stopBtn.disabled = false;
+
+      } catch (err) {
+        console.error("Erreur émission :", err);
+        statusEl.textContent = "Erreur : " + (err.message || err);
+        startBtn.disabled = false;
+      }
+    });
+
+    stopBtn.addEventListener('click', async () => {
+      stopBtn.disabled = true;
+      statusEl.textContent = "Arrêt en cours...";
+
+      try {
+        if (localAudioTrack) {
+          await localAudioTrack.stop();
+          localAudioTrack = null;
+        }
+        if (room) {
+          await room.disconnect();
+          room = null;
+        }
+        if (audioContext) {
+          audioContext.close();
+          audioContext = null;
+        }
+        statusEl.textContent = "Émission arrêtée.";
+        startBtn.disabled = false;
+
+      } catch (err) {
+        console.error("Erreur arrêt :", err);
+        statusEl.textContent = "Erreur arrêt : " + (err.message || err);
+        startBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
