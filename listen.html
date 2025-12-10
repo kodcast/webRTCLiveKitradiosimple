@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flux Vélorutionnaire</title>
+
+</head>
+<body>
+  <div class="container">
+  
+    <h1>Écouter le flux live</h1>
+    <p>Clique sur le bouton Play pour te connecter à la diffusion en direct.</p>
+    <div class="controls">
+      <button id="listenBtn" class="control-btn" title="Démarrer l'écoute"> ▶ </button>
+      <button id="stopBtn" class="control-btn" disabled title="Arrêter l'écoute">⏹</button>
+    </div>
+    <div id="status">Prêt à écouter</div>
+  </div>
+
+  <audio id="hiddenAudio" class="hidden-audio" autoplay playsinline></audio>
+
+<script type="module">
+import { Room } from 'https://cdn.jsdelivr.net/npm/livekit-client@2.5.1/dist/livekit-client.esm.mjs';
+
+const listenBtn = document.getElementById('listenBtn');
+const stopBtn = document.getElementById('stopBtn');
+const statusEl = document.getElementById('status');
+const hiddenAudio = document.getElementById('hiddenAudio');
+const LIVEKIT_URL = "wss://velorutionsaintnazaire.fr/livekit";
+let room = null;
+
+// Récupération du token côté serveur
+async function getToken() {
+  const response = await fetch('/token?room=room1&identity=auditeur_' + Date.now());
+  const data = await response.json();
+  return data.token;
+}
+
+listenBtn.addEventListener('click', async () => {
+  listenBtn.disabled = true;
+  stopBtn.disabled = false;
+  statusEl.textContent = "Connexion au serveur...";
+  statusEl.className = "";
+
+  try {
+    const token = await getToken();
+    room = new Room();
+
+    room
+      .on('connected', () => {
+        statusEl.textContent = "Connecté à la room";
+      })
+      .on('trackSubscribed', async (track, publication, participant) => {
+        if (track.kind !== 'audio') return;
+
+        const mediaStream = new MediaStream([track.mediaStreamTrack]);
+        hiddenAudio.srcObject = mediaStream;
+        hiddenAudio.autoplay = true;
+        hiddenAudio.playsInline = true;
+        hiddenAudio.muted = false;
+        await hiddenAudio.play().catch(() => {});
+
+        statusEl.textContent = `🎵 Diffusion en cours (${participant.identity})`;
+        statusEl.className = "playing";
+
+        // --- SYNCHRONISATION via playbackRate ---
+        const serverStartTime = publication.startedAt ? publication.startedAt.getTime() / 1000 : Date.now() / 1000;
+        const maxDrift = 0.01; // 5ms tolérés
+        const smoothFactor = 0.05; // ajuste vitesse progressivement
+
+        const syncLoop = () => {
+          if (!hiddenAudio.paused && hiddenAudio.readyState >= 2) {
+            const now = Date.now() / 1000;
+            const drift = (now - serverStartTime) - hiddenAudio.currentTime;
+            if (Math.abs(drift) > maxDrift) {
+              hiddenAudio.playbackRate = 1 + drift * smoothFactor;
+            } else {
+              hiddenAudio.playbackRate = 1;
+            }
+          }
+          requestAnimationFrame(syncLoop);
+        };
+        requestAnimationFrame(syncLoop);
+      })
+      .on('disconnected', () => {
+        statusEl.textContent = "Déconnecté";
+        statusEl.className = "";
+        listenBtn.disabled = false;
+        stopBtn.disabled = true;
+      });
+
+    await room.connect(LIVEKIT_URL, token, { autoSubscribe: true });
+
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = "Erreur de connexion";
+    statusEl.className = "error";
+    listenBtn.disabled = false;
+    stopBtn.disabled = true;
+  }
+});
+
+stopBtn.addEventListener('click', async () => {
+  stopBtn.disabled = true;
+  statusEl.textContent = "Arrêt en cours...";
+  statusEl.className = "";
+
+  try {
+    hiddenAudio.pause();
+    hiddenAudio.srcObject = null;
+
+    if (room) {
+      await room.disconnect();
+      room = null;
+    }
+
+    statusEl.textContent = "Écoute arrêtée";
+    listenBtn.disabled = false;
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = "Erreur lors de l'arrêt";
+    statusEl.className = "error";
+    listenBtn.disabled = false;
+    stopBtn.disabled = true;
+  }
+});
+</script>
+</body>
+</html>
+
