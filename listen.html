@@ -66,7 +66,7 @@ listenBtn.addEventListener('click', async () => {
 
         // --- SYNCHRONISATION via playbackRate ---
         const serverStartTime = publication.startedAt ? publication.startedAt.getTime() / 1000 : Date.now() / 1000;
-        const maxDrift = 0.01; // 5ms tolérés
+        const maxDrift = 0.01; // 10ms tolérés
         const smoothFactor = 0.05; // ajuste vitesse progressivement
 
         const syncLoop = () => {
