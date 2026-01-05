@@ -129,7 +129,8 @@ npm install
 
 ### **Service Systemd pour LiveKit**  
 Puis j'ai créé un fichier de service dans `/etc/systemd/system/livekit.service` :  
-```[Unit]
+```
+[Unit]
 Description=LiveKit Server
 After=network.target
 
@@ -198,7 +199,8 @@ Je crée ensuite un service systemd
 sudo nano /etc/systemd/system/livekit-token.service
 ```
 et j'y entre :
-```[Unit]
+```
+[Unit]
 Description=LiveKit Token Server
 After=network.target
 
