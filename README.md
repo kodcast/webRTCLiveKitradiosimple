@@ -108,7 +108,25 @@ keys:
   clé-api: "ma-clé-super-secrete"
 
 log_level: info  
-``` 
+```
+je crée ensuite le fichier `package.json` pour l'installation des dépendances Nodejs via NPM.  
+```
+{
+  "name": "livekit",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "livekit-server-sdk": "^2.13.3"
+  }
+}
+```  
+Puis j'installe les dépendances :  
+```bash
+npm install
+```  
+
 ### **Service Systemd pour LiveKit**  
 Puis j'ai créé un fichier de service dans `/etc/systemd/system/livekit.service` :  
 ```[Unit]
