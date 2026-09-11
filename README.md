@@ -1,3 +1,10 @@
+## Mise à jour du 11/09/2026
+
+- Ajout d'un fichier JavaScript séparé afin de mieux organiser le code.
+- Ajout d'un `manifest.json` pour permettre l'installation du lecteur sous forme de Web App.
+- Ajout d'un fichier audio silencieux pour maintenir une lecture audio active et éviter que certains navigateurs ne coupent le flux WebRTC lors de la mise en veille.
+- Mise à jour du fichier `listen.html` pour intégrer ces nouvelles fonctionnalités.
+
 ## Retour d'expérience et guide technique
 
 Lors de nos dernières vélorutions, un besoin revenait systématiquement : diffuser de la musique depuis le char tout en permettant aux participant·es d'utiliser leurs propres enceintes Bluetooth. L'objectif était simple : obtenir une ambiance sonore homogène, sans échos, sans décalages, et surtout sans avoir à trimballer une sono trop lourde.
