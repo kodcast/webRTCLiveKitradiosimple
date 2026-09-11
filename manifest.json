@@ -1,0 +1,37 @@
+{
+  "name": "Flux Velorution",
+  "short_name": "Flux Velorution",
+
+  "id": "/dif/",
+  "scope": "/dif/",
+  "start_url": "/dif/",
+
+  "theme_color": "#9141ac",
+  "background_color": "#ffffff",
+
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+
+  "orientation": "any",
+
+  "description": "Flux en direct de la Vélorution",
+
+  "categories": ["music", "entertainment", "radio"],
+
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  },
+
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
