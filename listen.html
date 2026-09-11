@@ -4,11 +4,66 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Flux Vélorutionnaire</title>
-
+  <link rel="manifest" href="manifest.json">
+  <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js?v2').then(reg => {
+        console.log('Service Worker enregistré', reg);
+      }).catch(err => {
+        console.error('Échec du SW', err);
+      });
+    });
+  }
+</script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+      background: linear-gradient(135deg, #111 0%, #222 100%);
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    .container {
+      max-width: 500px;
+      width: 100%;
+      padding: 30px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 20px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    h1 { margin-bottom: 15px; font-size: clamp(24px,5vw,32px); color: #4fc3f7; }
+    p { margin-bottom: 30px; line-height: 1.6; color: #ccc; font-size: clamp(14px,3vw,16px); }
+    .controls { display: flex; justify-content: center; gap: 20px; margin: 30px 0; }
+    .control-btn {
+      width: 70px; height: 70px; border-radius: 50%; border: none;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 24px;
+      transition: all 0.3s ease; box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+    #listenBtn { background: linear-gradient(135deg, #00c853 0%, #64dd17 100%); color: white; }
+    #stopBtn { background: linear-gradient(135deg, #ff5252 0%, #ff8a80 100%); color: white; }
+    .control-btn:disabled { background: #555; cursor: not-allowed; transform: none !important; box-shadow: none !important; opacity: 0.5; }
+    #status { margin-top: 20px; font-weight: bold; min-height: 24px; padding: 12px; background: rgba(255,255,255,0.1); border-radius: 10px; font-size: clamp(14px,3vw,16px); transition: all 0.3s ease; }
+    #status.playing { color: #00c853; background: rgba(0,200,83,0.1); }
+    #status.error { color: #ff5252; background: rgba(255,82,82,0.1); }
+    .hidden-audio { position: fixed; opacity: 0; pointer-events: none; width: 0; height: 0; }
+    .radio-icon { font-size: 60px; margin-bottom: 20px; animation: pulse 2s infinite; }
+    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+    @media (max-width: 768px) { .container { padding: 20px; margin: 10px; } .controls { gap: 15px; } .radio-icon { font-size: 50px; } }
+    @media (max-width: 480px) { body { padding: 10px; } .container { padding: 15px; } .radio-icon { font-size: 40px; } }
+  </style>
 </head>
 <body>
   <div class="container">
-  
+    <img src="../logo.png" style="width:40%" />
     <h1>Écouter le flux live</h1>
     <p>Clique sur le bouton Play pour te connecter à la diffusion en direct.</p>
     <div class="controls">
@@ -18,114 +73,14 @@
     <div id="status">Prêt à écouter</div>
   </div>
 
-  <audio id="hiddenAudio" class="hidden-audio" autoplay playsinline></audio>
+<audio
+  id="hiddenAudio"
+  autoplay
+  playsinline
+  controls
+  style="width:1px;height:1px;opacity:0.01;position:fixed;bottom:0;right:0;">
+</audio>
 
-<script type="module">
-import { Room } from 'https://cdn.jsdelivr.net/npm/livekit-client@2.5.1/dist/livekit-client.esm.mjs';
-
-const listenBtn = document.getElementById('listenBtn');
-const stopBtn = document.getElementById('stopBtn');
-const statusEl = document.getElementById('status');
-const hiddenAudio = document.getElementById('hiddenAudio');
-const LIVEKIT_URL = "wss://velorutionsaintnazaire.fr/livekit";
-let room = null;
-
-// Récupération du token côté serveur
-async function getToken() {
-  const response = await fetch('/token?room=room1&identity=auditeur_' + Date.now());
-  const data = await response.json();
-  return data.token;
-}
-
-listenBtn.addEventListener('click', async () => {
-  listenBtn.disabled = true;
-  stopBtn.disabled = false;
-  statusEl.textContent = "Connexion au serveur...";
-  statusEl.className = "";
-
-  try {
-    const token = await getToken();
-    room = new Room();
-
-    room
-      .on('connected', () => {
-        statusEl.textContent = "Connecté à la room";
-      })
-      .on('trackSubscribed', async (track, publication, participant) => {
-        if (track.kind !== 'audio') return;
-
-        const mediaStream = new MediaStream([track.mediaStreamTrack]);
-        hiddenAudio.srcObject = mediaStream;
-        hiddenAudio.autoplay = true;
-        hiddenAudio.playsInline = true;
-        hiddenAudio.muted = false;
-        await hiddenAudio.play().catch(() => {});
-
-        statusEl.textContent = `🎵 Diffusion en cours (${participant.identity})`;
-        statusEl.className = "playing";
-
-        // --- SYNCHRONISATION via playbackRate ---
-        const serverStartTime = publication.startedAt ? publication.startedAt.getTime() / 1000 : Date.now() / 1000;
-        const maxDrift = 0.01; // 10ms tolérés
-        const smoothFactor = 0.05; // ajuste vitesse progressivement
-
-        const syncLoop = () => {
-          if (!hiddenAudio.paused && hiddenAudio.readyState >= 2) {
-            const now = Date.now() / 1000;
-            const drift = (now - serverStartTime) - hiddenAudio.currentTime;
-            if (Math.abs(drift) > maxDrift) {
-              hiddenAudio.playbackRate = 1 + drift * smoothFactor;
-            } else {
-              hiddenAudio.playbackRate = 1;
-            }
-          }
-          requestAnimationFrame(syncLoop);
-        };
-        requestAnimationFrame(syncLoop);
-      })
-      .on('disconnected', () => {
-        statusEl.textContent = "Déconnecté";
-        statusEl.className = "";
-        listenBtn.disabled = false;
-        stopBtn.disabled = true;
-      });
-
-    await room.connect(LIVEKIT_URL, token, { autoSubscribe: true });
-
-  } catch (err) {
-    console.error(err);
-    statusEl.textContent = "Erreur de connexion";
-    statusEl.className = "error";
-    listenBtn.disabled = false;
-    stopBtn.disabled = true;
-  }
-});
-
-stopBtn.addEventListener('click', async () => {
-  stopBtn.disabled = true;
-  statusEl.textContent = "Arrêt en cours...";
-  statusEl.className = "";
-
-  try {
-    hiddenAudio.pause();
-    hiddenAudio.srcObject = null;
-
-    if (room) {
-      await room.disconnect();
-      room = null;
-    }
-
-    statusEl.textContent = "Écoute arrêtée";
-    listenBtn.disabled = false;
-  } catch (err) {
-    console.error(err);
-    statusEl.textContent = "Erreur lors de l'arrêt";
-    statusEl.className = "error";
-    listenBtn.disabled = false;
-    stopBtn.disabled = true;
-  }
-});
-</script>
+<script type="module" src="script.js?v10"></script>
 </body>
 </html>
-
